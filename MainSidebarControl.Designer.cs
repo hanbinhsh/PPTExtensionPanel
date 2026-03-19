@@ -33,14 +33,24 @@
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
+            this.btnPrevPage = new System.Windows.Forms.Button();
+            this.btnNextPage = new System.Windows.Forms.Button();
+            this.lblPageNum = new System.Windows.Forms.Label();
             this.pnlIconResult = new System.Windows.Forms.FlowLayoutPanel();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.btnSearch = new System.Windows.Forms.Button();
+            this.label1 = new System.Windows.Forms.Label();
             this.txtSearch = new System.Windows.Forms.TextBox();
+            this.numIconSize = new System.Windows.Forms.NumericUpDown();
+            this.btnResetColor = new System.Windows.Forms.Button();
+            this.btnColorPicker = new System.Windows.Forms.Button();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabPage2.SuspendLayout();
+            this.tableLayoutPanel2.SuspendLayout();
             this.tableLayoutPanel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numIconSize)).BeginInit();
             this.SuspendLayout();
             // 
             // btnAddTool
@@ -62,7 +72,6 @@
             this.flowLayoutPanel1.Name = "flowLayoutPanel1";
             this.flowLayoutPanel1.Size = new System.Drawing.Size(518, 962);
             this.flowLayoutPanel1.TabIndex = 1;
-            this.flowLayoutPanel1.Paint += new System.Windows.Forms.PaintEventHandler(this.flowLayoutPanel1_Paint);
             // 
             // tabControl1
             // 
@@ -89,6 +98,7 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.tableLayoutPanel2);
             this.tabPage2.Controls.Add(this.pnlIconResult);
             this.tabPage2.Controls.Add(this.tableLayoutPanel1);
             this.tabPage2.Location = new System.Drawing.Point(4, 25);
@@ -99,13 +109,60 @@
             this.tabPage2.Text = "图标";
             this.tabPage2.UseVisualStyleBackColor = true;
             // 
+            // tableLayoutPanel2
+            // 
+            this.tableLayoutPanel2.ColumnCount = 3;
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 15F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 70F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 15F));
+            this.tableLayoutPanel2.Controls.Add(this.btnPrevPage, 0, 0);
+            this.tableLayoutPanel2.Controls.Add(this.btnNextPage, 2, 0);
+            this.tableLayoutPanel2.Controls.Add(this.lblPageNum, 1, 0);
+            this.tableLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.tableLayoutPanel2.Location = new System.Drawing.Point(3, 928);
+            this.tableLayoutPanel2.Name = "tableLayoutPanel2";
+            this.tableLayoutPanel2.RowCount = 1;
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel2.Size = new System.Drawing.Size(518, 37);
+            this.tableLayoutPanel2.TabIndex = 3;
+            // 
+            // btnPrevPage
+            // 
+            this.btnPrevPage.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnPrevPage.Location = new System.Drawing.Point(3, 3);
+            this.btnPrevPage.Name = "btnPrevPage";
+            this.btnPrevPage.Size = new System.Drawing.Size(71, 31);
+            this.btnPrevPage.TabIndex = 0;
+            this.btnPrevPage.Text = "<";
+            this.btnPrevPage.UseVisualStyleBackColor = true;
+            // 
+            // btnNextPage
+            // 
+            this.btnNextPage.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnNextPage.Location = new System.Drawing.Point(442, 3);
+            this.btnNextPage.Name = "btnNextPage";
+            this.btnNextPage.Size = new System.Drawing.Size(73, 31);
+            this.btnNextPage.TabIndex = 1;
+            this.btnNextPage.Text = ">";
+            this.btnNextPage.UseVisualStyleBackColor = true;
+            // 
+            // lblPageNum
+            // 
+            this.lblPageNum.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblPageNum.Location = new System.Drawing.Point(80, 0);
+            this.lblPageNum.Name = "lblPageNum";
+            this.lblPageNum.Size = new System.Drawing.Size(356, 37);
+            this.lblPageNum.TabIndex = 0;
+            this.lblPageNum.Text = "第 0 / 0 页";
+            this.lblPageNum.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
             // pnlIconResult
             // 
             this.pnlIconResult.AutoScroll = true;
             this.pnlIconResult.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnlIconResult.Location = new System.Drawing.Point(3, 40);
+            this.pnlIconResult.Location = new System.Drawing.Point(3, 114);
             this.pnlIconResult.Name = "pnlIconResult";
-            this.pnlIconResult.Size = new System.Drawing.Size(518, 925);
+            this.pnlIconResult.Size = new System.Drawing.Size(518, 851);
             this.pnlIconResult.TabIndex = 2;
             // 
             // tableLayoutPanel1
@@ -114,38 +171,102 @@
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanel1.Controls.Add(this.btnSearch, 0, 0);
+            this.tableLayoutPanel1.Controls.Add(this.label1, 0, 1);
             this.tableLayoutPanel1.Controls.Add(this.txtSearch, 1, 0);
+            this.tableLayoutPanel1.Controls.Add(this.numIconSize, 1, 1);
+            this.tableLayoutPanel1.Controls.Add(this.btnResetColor, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.btnColorPicker, 1, 2);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Top;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(3, 3);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 1;
+            this.tableLayoutPanel1.RowCount = 3;
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 37F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(518, 37);
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 37F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 37F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(518, 111);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
             // btnSearch
             // 
-            this.btnSearch.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnSearch.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
             this.btnSearch.Location = new System.Drawing.Point(3, 3);
-            this.btnSearch.MaximumSize = new System.Drawing.Size(60, 30);
-            this.btnSearch.MinimumSize = new System.Drawing.Size(60, 30);
             this.btnSearch.Name = "btnSearch";
-            this.btnSearch.Size = new System.Drawing.Size(60, 30);
+            this.btnSearch.Size = new System.Drawing.Size(54, 31);
             this.btnSearch.TabIndex = 1;
             this.btnSearch.Text = "搜索";
             this.btnSearch.UseVisualStyleBackColor = true;
-            this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click_1);
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.label1.Location = new System.Drawing.Point(3, 37);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(54, 37);
+            this.label1.TabIndex = 0;
+            this.label1.Text = "边长";
+            this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // txtSearch
             // 
-            this.txtSearch.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtSearch.Font = new System.Drawing.Font("宋体", 18F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.txtSearch.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
+            this.txtSearch.Font = new System.Drawing.Font("宋体", 14F);
             this.txtSearch.Location = new System.Drawing.Point(63, 3);
             this.txtSearch.MaximumSize = new System.Drawing.Size(99999, 30);
             this.txtSearch.MinimumSize = new System.Drawing.Size(30, 30);
             this.txtSearch.Name = "txtSearch";
-            this.txtSearch.Size = new System.Drawing.Size(452, 30);
+            this.txtSearch.Size = new System.Drawing.Size(452, 34);
             this.txtSearch.TabIndex = 0;
+            // 
+            // numIconSize
+            // 
+            this.numIconSize.BackColor = System.Drawing.SystemColors.Window;
+            this.numIconSize.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.numIconSize.Cursor = System.Windows.Forms.Cursors.Default;
+            this.numIconSize.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.numIconSize.Font = new System.Drawing.Font("宋体", 14F);
+            this.numIconSize.Location = new System.Drawing.Point(63, 40);
+            this.numIconSize.Maximum = new decimal(new int[] {
+            1000,
+            0,
+            0,
+            0});
+            this.numIconSize.Minimum = new decimal(new int[] {
+            10,
+            0,
+            0,
+            0});
+            this.numIconSize.Name = "numIconSize";
+            this.numIconSize.Size = new System.Drawing.Size(452, 30);
+            this.numIconSize.TabIndex = 1;
+            this.numIconSize.Value = new decimal(new int[] {
+            10,
+            0,
+            0,
+            0});
+            this.numIconSize.ValueChanged += new System.EventHandler(this.numIconSize_ValueChanged);
+            // 
+            // btnResetColor
+            // 
+            this.btnResetColor.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnResetColor.Location = new System.Drawing.Point(3, 77);
+            this.btnResetColor.Name = "btnResetColor";
+            this.btnResetColor.Size = new System.Drawing.Size(54, 31);
+            this.btnResetColor.TabIndex = 0;
+            this.btnResetColor.Text = "重置";
+            this.btnResetColor.UseVisualStyleBackColor = true;
+            // 
+            // btnColorPicker
+            // 
+            this.btnColorPicker.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnColorPicker.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnColorPicker.Location = new System.Drawing.Point(63, 77);
+            this.btnColorPicker.Name = "btnColorPicker";
+            this.btnColorPicker.Size = new System.Drawing.Size(452, 31);
+            this.btnColorPicker.TabIndex = 0;
+            this.btnColorPicker.UseVisualStyleBackColor = true;
             // 
             // MainSidebarControl
             // 
@@ -158,8 +279,10 @@
             this.tabControl1.ResumeLayout(false);
             this.tabPage1.ResumeLayout(false);
             this.tabPage2.ResumeLayout(false);
+            this.tableLayoutPanel2.ResumeLayout(false);
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numIconSize)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -175,5 +298,13 @@
         private System.Windows.Forms.Button btnSearch;
         private System.Windows.Forms.TextBox txtSearch;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
+        private System.Windows.Forms.NumericUpDown numIconSize;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button btnResetColor;
+        private System.Windows.Forms.Button btnColorPicker;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel2;
+        private System.Windows.Forms.Button btnPrevPage;
+        private System.Windows.Forms.Button btnNextPage;
+        private System.Windows.Forms.Label lblPageNum;
     }
 }

@@ -1,12 +1,13 @@
 ﻿using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 using System.Windows.Forms;
-using Microsoft.Web.WebView2.WinForms;
 
 namespace PPTExtensionPanel
 {
@@ -19,9 +20,51 @@ namespace PPTExtensionPanel
         private Button btnNavLayout;
         private Button btnNavIcon;
 
+        private DateTime lastSearchTime = DateTime.MinValue;
+
+        private int defaultIconSize = 100;
+        private string defaultIconColor = "ORIGINAL";
+
+        private int currentPage = 1; // 当前页码
+        private int totalPages = 1;  // 总页数（由 JS 动态读取）
+        private string currentKeyword = ""; // 记录当前搜索词
+
+        private bool isConfigLoading = false;
+
+        public class IconResult
+        {
+            public int index { get; set; }
+            public string png { get; set; }
+        }
+
+        public class SingleColorResult
+        {
+            public string type { get; set; }
+            public string base64 { get; set; }
+        }
+
+        public class ListResult
+        {
+            public string type { get; set; }
+            public int totalPages { get; set; }
+            public List<IconResult> images { get; set; }
+        }
+
         public MainSidebarControl()
         {
             InitializeComponent();
+
+            if (numIconSize != null)
+            {
+                // 绑定值改变和键盘抬起事件（实现即输即存）
+                numIconSize.ValueChanged += numIconSize_ValueChanged;
+                numIconSize.KeyUp += numIconSize_KeyUp;
+            }
+
+            if (btnColorPicker != null) btnColorPicker.Click += btnColorPicker_Click;
+            if (btnResetColor != null) btnResetColor.Click += btnResetColor_Click;
+            if (btnPrevPage != null) btnPrevPage.Click += btnPrevPage_Click;
+            if (btnNextPage != null) btnNextPage.Click += btnNextPage_Click;
 
             // --- 1. 修复底层按钮样式 ---
             btnAddTool.FlatStyle = FlatStyle.Flat;
@@ -44,19 +87,38 @@ namespace PPTExtensionPanel
 
             btnSearch.Click += btnSearch_Click;
 
+            btnResetColor.FlatStyle = FlatStyle.Flat;
+            btnResetColor.BackColor = Color.FromArgb(64, 64, 64);
+            btnResetColor.ForeColor = Color.White;
+
+            btnPrevPage.FlatStyle = FlatStyle.Flat;
+            btnPrevPage.BackColor = Color.FromArgb(64, 64, 64);
+            btnPrevPage.ForeColor = Color.White;
+
+            btnNextPage.FlatStyle = FlatStyle.Flat;
+            btnNextPage.BackColor = Color.FromArgb(64, 64, 64);
+            btnNextPage.ForeColor = Color.White;
+
             // 绑定其他事件
             this.Resize += MainSidebarControl_Resize;
             this.Load += MainSidebarControl_Load;
             LoadSavedConfig();
+            if (numIconSize != null)
+            {
+                numIconSize.Value = defaultIconSize;
+            }
         }
 
         private async void MainSidebarControl_Load(object sender, EventArgs e)
         {
+            // 💡 核心装甲 1：如果浏览器已经创建过了，直接忽略多余的加载请求
+            if (wvContainer != null) return;
+
             try
             {
                 wvContainer = new WebView2();
-                wvContainer.Visible = false; // 让它隐身工作，用户根本看不到浏览器界面
-                this.Controls.Add(wvContainer); // 把它挂载到后台
+                wvContainer.Visible = false;
+                this.Controls.Add(wvContainer);
                 string userDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PptExtensionPanel", "WebView2Cache");
                 var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 await wvContainer.EnsureCoreWebView2Async(env);
@@ -87,17 +149,61 @@ namespace PPTExtensionPanel
         {
             if (File.Exists(configPath))
             {
-                string savedData = File.ReadAllText(configPath);
-                if (!string.IsNullOrWhiteSpace(savedData))
-                {
-                    currentSelectedIds = savedData.Split(',').ToList();
+                isConfigLoading = true;
 
-                    List<PptTool> restoredTools = new List<PptTool>();
-                    foreach (string id in currentSelectedIds)
+                try
+                {
+                    string[] lines = File.ReadAllLines(configPath);
+
+                    // 1. 读排版工具
+                    if (lines.Length > 0 && !string.IsNullOrWhiteSpace(lines[0]))
                     {
-                        restoredTools.Add(new PptTool { Name = GetToolNameById(id), MsoId = id });
+                        currentSelectedIds = lines[0].Split(',').ToList();
+                        List<PptTool> restoredTools = new List<PptTool>();
+                        foreach (string id in currentSelectedIds)
+                        {
+                            restoredTools.Add(new PptTool { Name = GetToolNameById(id), MsoId = id });
+                        }
+                        RefreshPanel(restoredTools);
                     }
-                    RefreshPanel(restoredTools);
+
+                    // 2. 读图标尺寸（此时即便触发 ValueChanged，也会被开头的 return 拦截）
+                    if (lines.Length > 1 && int.TryParse(lines[1], out int savedSize))
+                    {
+                        defaultIconSize = savedSize;
+                        if (numIconSize != null) numIconSize.Value = savedSize;
+                    }
+
+                    // 3. 读图标颜色
+                    if (lines.Length > 2 && !string.IsNullOrWhiteSpace(lines[2]))
+                    {
+                        defaultIconColor = lines[2];
+                    }
+
+                    // 4. 更新界面颜色
+                    UpdateColorUI();
+                }
+                finally
+                {
+                    isConfigLoading = false;
+                }
+            }
+        }
+
+        private void UpdateColorUI()
+        {
+            if (btnColorPicker != null)
+            {
+                if (defaultIconColor == "ORIGINAL")
+                {
+                    btnColorPicker.BackColor = Color.Transparent; // 原色模式下透明
+                    btnColorPicker.Text = "X"; // 给个小标志代表当前是原色
+                    btnColorPicker.ForeColor = Color.Gray;
+                }
+                else
+                {
+                    btnColorPicker.BackColor = ColorTranslator.FromHtml(defaultIconColor);
+                    btnColorPicker.Text = "";
                 }
             }
         }
@@ -130,7 +236,7 @@ namespace PPTExtensionPanel
                         currentSelectedIds.Add(tool.MsoId);
                     }
 
-                    File.WriteAllText(configPath, string.Join(",", currentSelectedIds));
+                    SaveConfig();
                     RefreshPanel(dialog.SelectedTools);
                 }
             }
@@ -197,21 +303,62 @@ namespace PPTExtensionPanel
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
-            // 保护机制：防止后台引擎还没启动完毕用户就点了搜索
+            if ((DateTime.Now - lastSearchTime).TotalMilliseconds < 500) return;
+            lastSearchTime = DateTime.Now;
+
             if (wvContainer == null || wvContainer.CoreWebView2 == null)
             {
-                MessageBox.Show("浏览器引擎正在努力启动中，请稍等一两秒再试！");
+                MessageBox.Show("浏览器引擎尚未就绪，请稍等！");
                 return;
             }
 
-            string keyword = Uri.EscapeDataString(txtSearch.Text.Trim());
-            if (string.IsNullOrEmpty(keyword)) return;
+            currentKeyword = Uri.EscapeDataString(txtSearch.Text.Trim());
+            if (string.IsNullOrEmpty(currentKeyword)) return;
+
+            currentPage = 1; // 每次新搜索，强行回到第一页
+            LoadIconPage();
+        }
+
+        private void btnPrevPage_Click(object sender, EventArgs e)
+        {
+            if (currentPage > 1)
+            {
+                currentPage--;
+                LoadIconPage();
+            }
+        }
+
+        private void btnNextPage_Click(object sender, EventArgs e)
+        {
+            if (currentPage < totalPages && !string.IsNullOrEmpty(currentKeyword))
+            {
+                currentPage++;
+                LoadIconPage();
+            }
+        }
+
+        private void LoadIconPage()
+        {
+            // 1. 触发加载 UI 反馈，全面禁用按钮防误触
+            btnSearch.Text = "搜索中...";
+            btnSearch.Enabled = false;
+            if (btnPrevPage != null) btnPrevPage.Enabled = false;
+            if (btnNextPage != null) btnNextPage.Enabled = false;
+            if (lblPageNum != null) lblPageNum.Text = $"第 {currentPage} 页\n(加载中...)";
 
             pnlIconResult.Controls.Clear();
+            Label lblLoading = new Label
+            {
+                Text = "正在极速抓取高清图标，请稍候...",
+                AutoSize = true,
+                Margin = new Padding(10),
+                Font = new Font("Microsoft YaHei", 9F),
+                ForeColor = SystemColors.GrayText
+            };
+            pnlIconResult.Controls.Add(lblLoading);
 
-            // MessageBox.Show("正在后台搜索: " + txtSearch.Text); 
-
-            string searchUrl = $"https://www.iconfont.cn/search/index?searchType=icon&q={keyword}";
+            // 2. 带上 page 参数发起翻页请求
+            string searchUrl = $"https://www.iconfont.cn/search/index?searchType=icon&q={currentKeyword}&page={currentPage}";
             wvContainer.CoreWebView2.Navigate(searchUrl);
         }
 
@@ -219,34 +366,73 @@ namespace PPTExtensionPanel
         {
             try
             {
-                // 直接读取底层的 JSON 格式字符串
                 string json = e.WebMessageAsJson;
 
-                // 此时的 json 会完美变成类似 ["data:image...","data:image..."] 的格式
-                List<string> imageBase64List = JsonConvert.DeserializeObject<List<string>>(json);
-
-                if (imageBase64List != null && imageBase64List.Count > 0)
+                // 拦截：如果是单张上色图片，直接插入并结束
+                if (json.Contains("\"type\":\"single\""))
                 {
-                    foreach (string base64Data in imageBase64List)
+                    var singleResult = JsonConvert.DeserializeObject<SingleColorResult>(json);
+                    if (singleResult != null && !string.IsNullOrEmpty(singleResult.base64))
                     {
-                        CreateIconPreview(base64Data);
+                        InsertBase64ImageToPpt(singleResult.base64);
+                    }
+                    return;
+                }
+
+                // --- 以下是列表加载完毕后的逻辑 ---
+                btnSearch.Text = "搜索";
+                btnSearch.Enabled = true;
+                pnlIconResult.Controls.Clear();
+
+                if (json.Contains("\"type\":\"list\""))
+                {
+                    var listResult = JsonConvert.DeserializeObject<ListResult>(json);
+
+                    // 💡 更新总页数，并刷新 UI 指示器
+                    totalPages = listResult.totalPages > 0 ? listResult.totalPages : 1;
+                    if (lblPageNum != null) lblPageNum.Text = $"第 {currentPage} / {totalPages} 页";
+
+                    // 💡 精准控制上下页按钮状态
+                    if (btnPrevPage != null) btnPrevPage.Enabled = (currentPage > 1);
+                    if (btnNextPage != null) btnNextPage.Enabled = (currentPage < totalPages);
+
+                    if (listResult.images != null && listResult.images.Count > 0)
+                    {
+                        foreach (var item in listResult.images)
+                        {
+                            CreateIconPreview(item);
+                        }
+                    }
+                    else
+                    {
+                        ShowEmptyMessage();
                     }
                 }
                 else
                 {
-                    // 顺便加个提示，如果抓取结果是空的，我们在界面上能知道
-                    MessageBox.Show("网页加载完成，但没有提取到图标，可能是网页结构变了或网络太慢。");
+                    ShowEmptyMessage();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("解析图标数据失败: " + ex.Message);
+                btnSearch.Text = "搜索";
+                btnSearch.Enabled = true;
+                if (btnPrevPage != null) btnPrevPage.Enabled = (currentPage > 1);
             }
         }
 
-        private void CreateIconPreview(string base64Data)
+        private void ShowEmptyMessage()
         {
-            string pureBase64 = base64Data.Substring(base64Data.IndexOf(",") + 1);
+            Label lblEmpty = new Label { Text = "未找到图标。", AutoSize = true, Margin = new Padding(10), Font = new Font("Microsoft YaHei", 9F) };
+            pnlIconResult.Controls.Add(lblEmpty);
+            if (btnPrevPage != null) btnPrevPage.Enabled = (currentPage > 1);
+            if (btnNextPage != null) btnNextPage.Enabled = false;
+            if (lblPageNum != null) lblPageNum.Text = $"第 {currentPage} 页";
+        }
+
+        private void CreateIconPreview(IconResult item)
+        {
+            string pureBase64 = item.png.Substring(item.png.IndexOf(",") + 1);
             byte[] imageBytes = Convert.FromBase64String(pureBase64);
 
             PictureBox pb = new PictureBox();
@@ -262,40 +448,42 @@ namespace PPTExtensionPanel
                 pb.Image = Image.FromStream(ms);
             }
 
-            pb.Click += (s, ev) => InsertBase64ImageToPpt(base64Data);
+            pb.Click += (s, ev) => TriggerInsertIcon(item.index, item.png);
 
-            if (pnlIconResult.InvokeRequired)
+            if (pnlIconResult.InvokeRequired) pnlIconResult.Invoke(new Action(() => pnlIconResult.Controls.Add(pb)));
+            else pnlIconResult.Controls.Add(pb);
+        }
+
+        private void TriggerInsertIcon(int index, string originalBase64)
+        {
+            if (defaultIconColor == "ORIGINAL")
             {
-                pnlIconResult.Invoke(new Action(() => pnlIconResult.Controls.Add(pb)));
+                // 如果是原色，不用麻烦 JS，直接用原本存下来的高清图插入，瞬间完成！
+                InsertBase64ImageToPpt(originalBase64);
             }
             else
             {
-                pnlIconResult.Controls.Add(pb);
+                // 如果选了颜色，命令 JS 在后台重新渲染一张，画完后 JS 会主动发消息回来
+                string script = $"window.processSingleIcon({index}, '{defaultIconColor}')";
+                wvContainer.CoreWebView2.ExecuteScriptAsync(script);
             }
         }
 
         private void InsertBase64ImageToPpt(string base64Data)
         {
-            try
-            {
-                Globals.ThisAddIn.Application.ActiveWindow.Activate();
-                var activeSlide = Globals.ThisAddIn.Application.ActiveWindow.View.Slide;
+            Globals.ThisAddIn.Application.ActiveWindow.Activate();
+            var activeSlide = Globals.ThisAddIn.Application.ActiveWindow.View.Slide;
 
-                string tempPath = Path.Combine(Path.GetTempPath(), $"temp_icon_{Guid.NewGuid()}.png");
-                string pureBase64 = base64Data.Substring(base64Data.IndexOf(",") + 1);
-                File.WriteAllBytes(tempPath, Convert.FromBase64String(pureBase64));
+            string tempPath = Path.Combine(Path.GetTempPath(), $"temp_icon_{Guid.NewGuid()}.png");
+            string pureBase64 = base64Data.Substring(base64Data.IndexOf(",") + 1);
+            File.WriteAllBytes(tempPath, Convert.FromBase64String(pureBase64));
+            float size = (float)defaultIconSize;
+            activeSlide.Shapes.AddPicture(tempPath,
+                Microsoft.Office.Core.MsoTriState.msoFalse,
+                Microsoft.Office.Core.MsoTriState.msoTrue,
+                100, 100, size, size);
 
-                activeSlide.Shapes.AddPicture(tempPath,
-                    Microsoft.Office.Core.MsoTriState.msoFalse,
-                    Microsoft.Office.Core.MsoTriState.msoTrue,
-                    100, 100, -1, -1);
-
-                File.Delete(tempPath);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("插入图标失败: " + ex.Message);
-            }
+            File.Delete(tempPath);
         }
 
         private void WvContainer_CoreWebView2_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
@@ -304,20 +492,93 @@ namespace PPTExtensionPanel
             {
                 InjectIconExtractionScript();
             }
+            else
+            {
+                // 💡 核心装甲 3：如果没有网络，或者网页打不开
+                btnSearch.Text = "搜索";
+                btnSearch.Enabled = true;
+                pnlIconResult.Controls.Clear();
+
+                Label lblError = new Label
+                {
+                    Text = "网页加载失败，请检查你的网络连接！",
+                    AutoSize = true,
+                    Margin = new Padding(10),
+                    Font = new Font("Microsoft YaHei", 9F, FontStyle.Regular),
+                    ForeColor = Color.Red // 用红色醒目提示
+                };
+                pnlIconResult.Controls.Add(lblError);
+            }
         }
 
         private async void InjectIconExtractionScript()
         {
             string jsScript = @"
-        setTimeout(async function() {
-            console.log('开始提取高清图标...');
-            const finalImages = [];
-            
-            // 兼容性查找：Iconfont 的类名有时是 icon-item，有时是 block-icon-list 下的 li
-            const iconLis = document.querySelectorAll('.icon-item, .block-icon-list li');
+setTimeout(async function() {
+    let attempts = 0;
+    window.extractedSvgs = []; 
+    
+    // 专门为 C# 上色待命的画师
+    window.processSingleIcon = function(index, color) {
+        try {
+            const rawSvg = window.extractedSvgs[index];
+            if (!rawSvg) return;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(rawSvg, 'image/svg+xml');
+            const clone = doc.documentElement;
 
-            for (const li of iconLis) {
+            clone.setAttribute('fill', color);
+            clone.style.color = color;
+            const allElements = clone.querySelectorAll('*');
+            allElements.forEach(el => {
+                const tagName = el.tagName.toLowerCase();
+                const fill = el.getAttribute('fill');
+                const stroke = el.getAttribute('stroke');
+                if ((fill && fill !== 'none') || ['path', 'rect', 'circle', 'polygon', 'ellipse'].includes(tagName)) {
+                    el.setAttribute('fill', color);
+                }
+                if (stroke && stroke !== 'none') {
+                    el.setAttribute('stroke', color);
+                }
+            });
+
+            const serializer = new XMLSerializer();
+            let newSvgString = serializer.serializeToString(clone);
+            if (!newSvgString.includes('xmlns=')) {
+                newSvgString = newSvgString.replace('<svg', '<svg xmlns=""http://www.w3.org/2000/svg""');
+            }
+            const base64Svg = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(newSvgString)));
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1000; canvas.height = 1000;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                window.chrome.webview.postMessage({ type: 'single', base64: canvas.toDataURL('image/png') });
+            };
+            img.src = base64Svg;
+        } catch(e) {}
+    };
+
+    // 💡 极速轮询与列表提取
+    const checkExist = setInterval(async function() {
+        const iconLis = document.querySelectorAll('.icon-item, .block-icon-list li');
+        
+        if (iconLis.length > 0) {
+            clearInterval(checkExist); 
+            
+            // 💡 核心：读取网页上的总页数
+            let parsedTotalPages = 1;
+            const totalSpan = document.querySelector('.block-pagination .total');
+            if (totalSpan) {
+                const match = totalSpan.innerText.match(/\d+/);
+                if (match) parsedTotalPages = parseInt(match[0], 10);
+            }
+
+            const finalImages = [];
+            for (let i = 0; i < iconLis.length; i++) {
                 try {
+                    const li = iconLis[i];
                     const svgEl = li.querySelector('svg');
                     if (!svgEl) continue;
 
@@ -343,22 +604,17 @@ namespace PPTExtensionPanel
                     clone.removeAttribute('style');
                     clone.style.overflow = 'visible';
 
-                    const parentColor = '#333333'; 
-                    const allElements = clone.querySelectorAll('*');
-                    allElements.forEach(el => {
-                        if (el.getAttribute('fill') === 'currentColor') el.setAttribute('fill', parentColor);
-                        if (el.getAttribute('stroke') === 'currentColor') el.setAttribute('stroke', parentColor);
-                    });
-
                     const serializer = new XMLSerializer();
                     let svgString = serializer.serializeToString(clone);
                     if (!svgString.includes('xmlns=')) {
                         svgString = svgString.replace('<svg', '<svg xmlns=""http://www.w3.org/2000/svg""');
                     }
                     
+                    window.extractedSvgs.push(svgString);
+                    const currentIndex = window.extractedSvgs.length - 1;
+
                     const base64Svg = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgString)));
-                    
-                    const base64Png = await new Promise((resolve, reject) => {
+                    const base64Png = await new Promise((resolve) => {
                         const img = new Image();
                         img.onload = function() {
                             const canvas = document.createElement('canvas');
@@ -367,25 +623,34 @@ namespace PPTExtensionPanel
                             ctx.drawImage(img, 0, 0);
                             resolve(canvas.toDataURL('image/png'));
                         };
-                        img.onerror = () => reject('加载失败');
+                        img.onerror = () => resolve(null);
                         img.src = base64Svg;
                     });
 
-                    finalImages.push(base64Png);
-                } catch (e) { console.error('提取单个图标出错', e); }
+                    if(base64Png) {
+                        finalImages.push({ index: currentIndex, png: base64Png });
+                    }
+                } catch (e) { }
             }
 
-            // 抓取完毕后发回 C#
-            window.chrome.webview.postMessage(finalImages);
-        }, 2500);
-    ";
-
-            await wvContainer.CoreWebView2.ExecuteScriptAsync(jsScript);
+            // 💡 核心：把总页数和图片打包成一个 List 对象发给 C#
+            window.chrome.webview.postMessage({
+                type: 'list',
+                totalPages: parsedTotalPages,
+                images: finalImages
+            });
+        } 
+        else {
+            attempts++;
+            if (attempts > 100) { 
+                clearInterval(checkExist);
+                window.chrome.webview.postMessage({ type: 'list', totalPages: 1, images: [] }); 
+            }
         }
-
-        private void wvContainer_Click(object sender, EventArgs e)
-        {
-
+    }, 100); 
+}, 500); 
+";
+            await wvContainer.CoreWebView2.ExecuteScriptAsync(jsScript);
         }
 
         // 声明需要的变量
@@ -409,6 +674,9 @@ namespace PPTExtensionPanel
                 panelIcon.Controls.Add(tabControl1.TabPages[1].Controls[0]);
             }
 
+            if (pnlIconResult != null) pnlIconResult.BringToFront();
+            if (tableLayoutPanel1 != null) tableLayoutPanel1.SendToBack();
+
             // 3. 卸磨杀驴：彻底从界面上删除罪魁祸首 TabControl，并且释放它的内存！
             this.Controls.Remove(tabControl1);
             tabControl1.Dispose();
@@ -425,6 +693,21 @@ namespace PPTExtensionPanel
 
             btnNavIcon = new Button { Text = "图标", Width = 90, Height = 35, Location = new Point(90, 0), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
             btnNavIcon.FlatAppearance.BorderSize = 0;
+
+            btnNavLayout.UseVisualStyleBackColor = false;
+            btnNavIcon.UseVisualStyleBackColor = false;
+
+            btnNavLayout.FlatStyle = FlatStyle.Flat;
+            btnNavLayout.FlatAppearance.BorderSize = 0;
+            btnNavLayout.BackColor = Color.Transparent;
+            btnNavLayout.FlatAppearance.MouseOverBackColor = Color.FromArgb(80, 80, 80);
+            btnNavLayout.FlatAppearance.MouseDownBackColor = Color.FromArgb(60, 60, 60);
+
+            btnNavIcon.FlatStyle = FlatStyle.Flat;
+            btnNavIcon.FlatAppearance.BorderSize = 0;
+            btnNavIcon.BackColor = Color.Transparent;
+            btnNavIcon.FlatAppearance.MouseOverBackColor = Color.FromArgb(80, 80, 80);
+            btnNavIcon.FlatAppearance.MouseDownBackColor = Color.FromArgb(60, 60, 60);
 
             navPanel.Controls.Add(btnNavLayout);
             navPanel.Controls.Add(btnNavIcon);
@@ -457,14 +740,61 @@ namespace PPTExtensionPanel
             btnNavIcon.Font = new Font("Microsoft YaHei", 9F, !isLayoutSelected ? FontStyle.Bold : FontStyle.Regular);
         }
 
-        private void flowLayoutPanel1_Paint(object sender, PaintEventArgs e)
+        private void SaveConfig()
         {
+            if (isConfigLoading) return;
 
+            try
+            {
+                File.WriteAllLines(configPath, new string[] {
+            string.Join(",", currentSelectedIds),
+            defaultIconSize.ToString(),
+            defaultIconColor // 把颜色存入本地文件
+        });
+            }
+            catch { }
         }
 
-        private void btnSearch_Click_1(object sender, EventArgs e)
+        private void numIconSize_ValueChanged(object sender, EventArgs e)
         {
+            defaultIconSize = (int)numIconSize.Value;
+            SaveConfig();
+        }
 
+        private void numIconSize_KeyUp(object sender, KeyEventArgs e)
+        {
+            // 只要键盘抬起，哪怕没按回车，也强行读取文本并保存！
+            if (int.TryParse(numIconSize.Text, out int newSize))
+            {
+                if (newSize >= numIconSize.Minimum && newSize <= numIconSize.Maximum)
+                {
+                    defaultIconSize = newSize;
+                    SaveConfig();
+                }
+            }
+        }
+
+        private void btnColorPicker_Click(object sender, EventArgs e)
+        {
+            using (ColorDialog cd = new ColorDialog())
+            {
+                cd.FullOpen = true;
+                if (defaultIconColor != "ORIGINAL") cd.Color = ColorTranslator.FromHtml(defaultIconColor);
+
+                if (cd.ShowDialog() == DialogResult.OK)
+                {
+                    defaultIconColor = ColorTranslator.ToHtml(cd.Color); // 转成 #FFFFFF 格式
+                    UpdateColorUI();
+                    SaveConfig();
+                }
+            }
+        }
+
+        private void btnResetColor_Click(object sender, EventArgs e)
+        {
+            defaultIconColor = "ORIGINAL";
+            UpdateColorUI();
+            SaveConfig();
         }
     }
 }
