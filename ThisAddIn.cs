@@ -20,7 +20,7 @@ namespace PPTExtensionPanel
             sidebarControl = new MainSidebarControl();
             CustomTaskPane = this.CustomTaskPanes.Add(sidebarControl, "Ice菜单");
             CustomTaskPane.DockPosition = Microsoft.Office.Core.MsoCTPDockPosition.msoCTPDockPositionLeft;
-            CustomTaskPane.Width = 120;
+            CustomTaskPane.Width = 200;
             CustomTaskPane.Visible = true;
         }
 
