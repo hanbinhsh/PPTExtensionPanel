@@ -14,6 +14,8 @@ namespace PPTExtensionPanel
         private MainSidebarControl sidebarControl;
         public Microsoft.Office.Tools.CustomTaskPane CustomTaskPane { get; private set; }
 
+        private string paneStatePath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PptPanelState.txt");
+
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
             System.Windows.Forms.Application.EnableVisualStyles();
@@ -21,7 +23,27 @@ namespace PPTExtensionPanel
             CustomTaskPane = this.CustomTaskPanes.Add(sidebarControl, "Ice菜单");
             CustomTaskPane.DockPosition = Microsoft.Office.Core.MsoCTPDockPosition.msoCTPDockPositionLeft;
             CustomTaskPane.Width = 200;
-            CustomTaskPane.Visible = true;
+            bool isVisible = true;
+            if (System.IO.File.Exists(paneStatePath))
+            {
+                string savedState = System.IO.File.ReadAllText(paneStatePath).Trim();
+                if (savedState == "False")
+                {
+                    isVisible = false;
+                }
+            }
+            CustomTaskPane.Visible = isVisible;
+            CustomTaskPane.VisibleChanged += CustomTaskPane_VisibleChanged;
+        }
+
+        private void CustomTaskPane_VisibleChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                // 侧边栏状态一旦改变，立刻把 True 或 False 写进本地文件
+                System.IO.File.WriteAllText(paneStatePath, CustomTaskPane.Visible.ToString());
+            }
+            catch { }
         }
 
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
