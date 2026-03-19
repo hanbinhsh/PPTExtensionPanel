@@ -1,0 +1,34 @@
+# ==================================
+# Visual Studio / C# 标准忽略配置
+# ==================================
+
+# 1. 编译输出目录 (绝对不能上传，会引发极大的合并冲突)
+[Bb]in/
+[Oo]bj/
+
+# 2. Visual Studio 本地用户设置和缓存 (包含你的窗口布局、断点等私密信息)
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+# 3. NuGet 包文件夹 (GitHub 会通过你的 .csproj 文件自动还原，无需上传实体包)
+packages/
+*.nupkg
+
+# 4. VSTO 专属发布目录 (如果你手滑点过“发布”按钮生成的安装包)
+Publish/
+publish/
+app.publish/
+
+# 5. 临时文件、日志和缓存
+*.log
+*.cache
+*.tmp
+*.bak
+~$*
+
+# 6. 个人系统配置文件 (如 macOS 产生的垃圾文件)
+.DS_Store
+Thumbs.db
