@@ -1,6 +1,10 @@
 # 🚀 PowerPoint 现代增强侧边栏插件 (PPT Extension Panel)
 
-这是一个基于 C# VSTO 开发的 PowerPoint 增强插件。它深度集成了原生 Office 界面风格，不仅提供可高度自定义的快捷排版工具，还内置了一个基于 WebView2 的无感极速图标搜索引擎（基于阿里巴巴矢量图标库），让演示文稿的制作如虎添翼。
+这是一个基于 C# VSTO 开发的 PowerPoint 增强插件。它深度集成了原生 Office 界面风格，不仅提供可高度自定义的快捷排版工具，还内置了一个基于 WebView2 的无感极速图标搜索引擎（基于阿里巴巴矢量图标库），点击即可导入图标到ppt中，让演示文稿的制作如虎添翼。
+
+<img width="2560" height="1440" alt="YCZU{BBJ2XS8CPNCPCGZ%UK" src="https://github.com/user-attachments/assets/5c7f420b-f0ef-467c-9b60-64aa8c133398" />
+<img width="2560" height="1440" alt="RTC833_4X398T6OC$J%5ZK7" src="https://github.com/user-attachments/assets/ae68aadb-73c6-4e00-bd4f-e0d4438a4063" />
+
 
 ## ✨ 核心特性 (Features)
 
@@ -64,3 +68,7 @@
 ## 📄 许可协议 (License)
 
 本项目仅供学习与交流使用。图标抓取逻辑依赖于公开网页结构，若目标网站（如 Iconfont）更改 DOM 结构，可能需要同步更新解析脚本。
+
+---
+
+Developed with ❤️ by IceRinne
