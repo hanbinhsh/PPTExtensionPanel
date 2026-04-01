@@ -15,10 +15,7 @@ namespace PPTExtensionPanel
 
         private void button1_Click(object sender, RibbonControlEventArgs e)
         {
-            if (Globals.ThisAddIn.CustomTaskPane != null)
-            {
-                Globals.ThisAddIn.CustomTaskPane.Visible = !Globals.ThisAddIn.CustomTaskPane.Visible;
-            }
+            Globals.ThisAddIn.ToggleActiveWindowPane();
         }
     }
 }
