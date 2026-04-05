@@ -1,7 +1,8 @@
+using Microsoft.Office.Tools;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Microsoft.Office.Tools;
+using System.Windows.Forms;
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 
 namespace PPTExtensionPanel
@@ -15,59 +16,145 @@ namespace PPTExtensionPanel
         private readonly string paneStatePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "PptPanelState.txt");
+        private readonly string logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "PPTExtensionPanel.log");
 
         private bool defaultPaneVisible = true;
+        private Timer deferredStartupTimer;
 
-        public Microsoft.Office.Tools.CustomTaskPane CustomTaskPane
+        public CustomTaskPane CustomTaskPane
         {
             get { return GetActiveWindowPane(); }
         }
 
         private void ThisAddIn_Startup(object sender, EventArgs e)
         {
-            System.Windows.Forms.Application.EnableVisualStyles();
+            try
+            {
+                System.Windows.Forms.Application.EnableVisualStyles();
+                defaultPaneVisible = LoadPaneVisibleState();
 
-            defaultPaneVisible = LoadPaneVisibleState();
+                this.Application.WindowActivate += Application_WindowActivate;
 
-            Application.WindowActivate += Application_WindowActivate;
-
-            EnsurePaneForWindow(Application.ActiveWindow);
+                if (defaultPaneVisible)
+                {
+                    // Defer pane creation until Office finishes its own startup work.
+                    deferredStartupTimer = new Timer();
+                    deferredStartupTimer.Interval = 800;
+                    deferredStartupTimer.Tick += DeferredStartupTimer_Tick;
+                    deferredStartupTimer.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog("ThisAddIn_Startup", ex);
+            }
         }
 
         private void ThisAddIn_Shutdown(object sender, EventArgs e)
         {
-            Application.WindowActivate -= Application_WindowActivate;
-
-            foreach (CustomTaskPane pane in panesByWindowHandle.Values)
+            try
             {
-                pane.VisibleChanged -= CustomTaskPane_VisibleChanged;
-            }
+                if (deferredStartupTimer != null)
+                {
+                    deferredStartupTimer.Stop();
+                    deferredStartupTimer.Tick -= DeferredStartupTimer_Tick;
+                    deferredStartupTimer.Dispose();
+                    deferredStartupTimer = null;
+                }
 
-            panesByWindowHandle.Clear();
+                this.Application.WindowActivate -= Application_WindowActivate;
+
+                foreach (CustomTaskPane pane in panesByWindowHandle.Values)
+                {
+                    pane.VisibleChanged -= CustomTaskPane_VisibleChanged;
+                }
+
+                panesByWindowHandle.Clear();
+            }
+            catch (Exception ex)
+            {
+                WriteLog("ThisAddIn_Shutdown", ex);
+            }
         }
 
         public void ToggleActiveWindowPane()
         {
-            CleanupClosedWindowPanes();
-
-            CustomTaskPane pane = EnsurePaneForWindow(Application.ActiveWindow);
-            if (pane == null)
+            try
             {
-                return;
-            }
+                CleanupClosedWindowPanes();
 
-            pane.Visible = !pane.Visible;
+                CustomTaskPane pane = EnsurePaneForWindow(this.Application.ActiveWindow);
+                if (pane == null)
+                {
+                    MessageBox.Show("当前没有可用的 PowerPoint 窗口，无法显示 Ice 菜单。");
+                    return;
+                }
+
+                pane.Visible = !pane.Visible;
+            }
+            catch (Exception ex)
+            {
+                WriteLog("ToggleActiveWindowPane", ex);
+                MessageBox.Show("Ice 菜单初始化失败，请查看日志：" + logPath);
+            }
         }
 
         public CustomTaskPane GetActiveWindowPane()
         {
-            return EnsurePaneForWindow(Application.ActiveWindow);
+            try
+            {
+                return EnsurePaneForWindow(this.Application.ActiveWindow);
+            }
+            catch (Exception ex)
+            {
+                WriteLog("GetActiveWindowPane", ex);
+                return null;
+            }
+        }
+
+        private void DeferredStartupTimer_Tick(object sender, EventArgs e)
+        {
+            if (deferredStartupTimer == null)
+            {
+                return;
+            }
+
+            deferredStartupTimer.Stop();
+            deferredStartupTimer.Tick -= DeferredStartupTimer_Tick;
+            deferredStartupTimer.Dispose();
+            deferredStartupTimer = null;
+
+            try
+            {
+                CustomTaskPane pane = EnsurePaneForWindow(this.Application.ActiveWindow);
+                if (pane != null)
+                {
+                    pane.Visible = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog("DeferredStartupTimer_Tick", ex);
+            }
         }
 
         private void Application_WindowActivate(PowerPoint.Presentation pres, PowerPoint.DocumentWindow wn)
         {
-            CleanupClosedWindowPanes();
-            EnsurePaneForWindow(wn);
+            try
+            {
+                CleanupClosedWindowPanes();
+
+                if (defaultPaneVisible)
+                {
+                    EnsurePaneForWindow(wn);
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog("Application_WindowActivate", ex);
+            }
         }
 
         private CustomTaskPane EnsurePaneForWindow(PowerPoint.DocumentWindow window)
@@ -84,7 +171,7 @@ namespace PPTExtensionPanel
             }
 
             MainSidebarControl sidebarControl = new MainSidebarControl();
-            CustomTaskPane pane = CustomTaskPanes.Add(sidebarControl, PaneTitle, window);
+            CustomTaskPane pane = this.CustomTaskPanes.Add(sidebarControl, PaneTitle, window);
             pane.DockPosition = Microsoft.Office.Core.MsoCTPDockPosition.msoCTPDockPositionLeft;
             pane.Width = PaneWidth;
             pane.Visible = defaultPaneVisible;
@@ -98,7 +185,7 @@ namespace PPTExtensionPanel
         {
             HashSet<int> liveHandles = new HashSet<int>();
 
-            foreach (PowerPoint.DocumentWindow window in Application.Windows)
+            foreach (PowerPoint.DocumentWindow window in this.Application.Windows)
             {
                 liveHandles.Add(window.HWND);
             }
@@ -116,7 +203,7 @@ namespace PPTExtensionPanel
             {
                 CustomTaskPane pane = panesByWindowHandle[handle];
                 pane.VisibleChanged -= CustomTaskPane_VisibleChanged;
-                CustomTaskPanes.Remove(pane);
+                this.CustomTaskPanes.Remove(pane);
                 panesByWindowHandle.Remove(handle);
             }
         }
@@ -135,8 +222,9 @@ namespace PPTExtensionPanel
             {
                 File.WriteAllText(paneStatePath, defaultPaneVisible.ToString());
             }
-            catch
+            catch (Exception ex)
             {
+                WriteLog("CustomTaskPane_VisibleChanged", ex);
             }
         }
 
@@ -146,15 +234,38 @@ namespace PPTExtensionPanel
             {
                 if (!File.Exists(paneStatePath))
                 {
-                    return true;
+                    return false;
                 }
 
                 string savedState = File.ReadAllText(paneStatePath).Trim();
-                return !string.Equals(savedState, "False", StringComparison.OrdinalIgnoreCase);
+                return string.Equals(savedState, "True", StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                WriteLog("LoadPaneVisibleState", ex);
+                return false;
+            }
+        }
+
+        private void WriteLog(string stage, Exception ex)
+        {
+            try
+            {
+                string logDirectory = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrEmpty(logDirectory) && !Directory.Exists(logDirectory))
+                {
+                    Directory.CreateDirectory(logDirectory);
+                }
+
+                string message =
+                    "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] " +
+                    stage + Environment.NewLine +
+                    ex + Environment.NewLine + Environment.NewLine;
+
+                File.AppendAllText(logPath, message);
             }
             catch
             {
-                return true;
             }
         }
 
@@ -166,8 +277,8 @@ namespace PPTExtensionPanel
         /// </summary>
         private void InternalStartup()
         {
-            Startup += new EventHandler(ThisAddIn_Startup);
-            Shutdown += new EventHandler(ThisAddIn_Shutdown);
+            this.Startup += new EventHandler(ThisAddIn_Startup);
+            this.Shutdown += new EventHandler(ThisAddIn_Shutdown);
         }
 
         #endregion
